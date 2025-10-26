@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { supabase } from '../lib/supabaseClient';
 
 const API_BASE_URL = 'http://localhost:5000/api';
 
@@ -16,6 +17,20 @@ class EventService {
     } catch (error) {
       this.useBackend = false;
       return false;
+    }
+  }
+
+  async getCurrentUserId() {
+    try {
+      const storedUser = sessionStorage.getItem('user') || localStorage.getItem('user');
+      if (storedUser) {
+        const user = JSON.parse(storedUser);
+        return user.id;
+      }
+      return null;
+    } catch (error) {
+      console.error('Error getting current user:', error);
+      return null;
     }
   }
 
@@ -56,46 +71,42 @@ class EventService {
 
   async createEvent(eventData) {
     try {
-      await this.checkBackendConnection();
-
-      if (this.useBackend) {
-        const response = await axios.post(`${API_BASE_URL}/events`, eventData);
-        const newEvent = response.data.data;
-
-        const events = await this.getAllEvents();
-        events.unshift(newEvent);
-        localStorage.setItem(this.storageKey, JSON.stringify(events));
-
-        return newEvent;
-      } else {
-        const events = await this.getAllEvents();
-        const newEvent = {
-          id: Date.now().toString(),
-          ...eventData,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        };
-
-        events.unshift(newEvent);
-        localStorage.setItem(this.storageKey, JSON.stringify(events));
-
-        return newEvent;
+      const userId = await this.getCurrentUserId();
+      if (!userId) {
+        throw new Error('User not authenticated');
       }
-    } catch (error) {
-      console.error('Error creating event:', error);
+
+      const { data: newEvent, error } = await supabase
+        .from('events')
+        .insert({
+          user_id: userId,
+          event_name: eventData.eventName || '',
+          event_type: eventData.eventType || '',
+          description: eventData.description || '',
+          date: eventData.date || null,
+          time: eventData.time || null,
+          location: eventData.location || '',
+          city: eventData.city || '',
+          venue_type: eventData.venueType || '',
+          audience_size: eventData.audienceSize || 0,
+          duration: eventData.duration || ''
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error creating event in Supabase:', error);
+        throw error;
+      }
 
       const events = await this.getAllEvents();
-      const newEvent = {
-        id: Date.now().toString(),
-        ...eventData,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      };
-
       events.unshift(newEvent);
       localStorage.setItem(this.storageKey, JSON.stringify(events));
 
       return newEvent;
+    } catch (error) {
+      console.error('Error creating event:', error);
+      throw error;
     }
   }
 

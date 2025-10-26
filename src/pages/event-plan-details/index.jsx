@@ -69,7 +69,14 @@ const EventPlanDetails = () => {
 
           if (aiContent) {
             aiGeneratedPlan = aiContent.generated_content;
+            console.log('AI Generated Plan loaded:', aiGeneratedPlan);
+            console.log('Timeline data:', aiGeneratedPlan?.timeline);
           }
+        }
+
+        let calculatedBudget = preferences?.budget || 75000;
+        if (aiGeneratedPlan && aiGeneratedPlan.budget) {
+          calculatedBudget = Object.values(aiGeneratedPlan.budget).reduce((sum, val) => sum + (parseInt(val) || 0), 0);
         }
 
         const mockEventData = {
@@ -79,7 +86,7 @@ const EventPlanDetails = () => {
           time: eventDataToUse?.time || preferences?.eventTime || '09:00',
           location: eventDataToUse?.location || (preferences?.venue ? getVenueName(preferences.venue) : 'Grand Convention Center, San Francisco'),
           attendees: eventDataToUse?.audience_size || preferences?.numberOfPeople || 500,
-          budget: preferences?.budget || 75000,
+          budget: calculatedBudget,
           status: 'planning',
           description: eventDataToUse?.description || 'A comprehensive technology conference featuring industry leaders and innovative solutions.',
           contacts: [
@@ -106,20 +113,38 @@ const EventPlanDetails = () => {
 
         let mockTimelineData = [];
 
-        if (aiGeneratedPlan && aiGeneratedPlan.timeline) {
-          mockTimelineData = aiGeneratedPlan.timeline.map((item, index) => ({
-            id: `tl_${index + 1}`,
-            title: item.activity || item.title || 'Activity',
-            type: 'presentation',
-            startTime: item.time || '09:00',
-            duration: parseInt(item.duration) || 60,
-            location: item.location || 'Main Hall',
-            attendees: item.attendees || 50,
-            description: item.description || item.activity || '',
-            resources: item.resources || [],
-            assignedTo: item.assignedTo || [],
-            notes: item.notes || ''
-          }));
+        if (aiGeneratedPlan && aiGeneratedPlan.timeline && Array.isArray(aiGeneratedPlan.timeline)) {
+          const determineActivityType = (activity) => {
+            const activityLower = (activity || '').toLowerCase();
+            if (activityLower.includes('setup') || activityLower.includes('registration')) return 'setup';
+            if (activityLower.includes('break') || activityLower.includes('coffee')) return 'break';
+            if (activityLower.includes('lunch') || activityLower.includes('meal') || activityLower.includes('dinner')) return 'meal';
+            if (activityLower.includes('network')) return 'networking';
+            if (activityLower.includes('clean')) return 'cleanup';
+            return 'presentation';
+          };
+
+          mockTimelineData = aiGeneratedPlan.timeline.map((item, index) => {
+            const durationInMinutes = typeof item.duration === 'string'
+              ? parseInt(item.duration.replace(/[^0-9]/g, '')) || 60
+              : parseInt(item.duration) || 60;
+
+            const activityTitle = item.activity || item.title || 'Activity';
+
+            return {
+              id: `tl_${index + 1}`,
+              title: activityTitle,
+              type: determineActivityType(activityTitle),
+              startTime: item.time || '09:00',
+              duration: durationInMinutes,
+              location: item.location || item.venue || eventDataToUse?.location || 'Main Hall',
+              attendees: item.attendees || eventDataToUse?.audience_size || 50,
+              description: item.description || activityTitle,
+              resources: Array.isArray(item.resources) ? item.resources : [],
+              assignedTo: Array.isArray(item.assignedTo) ? item.assignedTo : [],
+              notes: item.notes || ''
+            };
+          });
         } else {
           mockTimelineData = [
             {
@@ -274,7 +299,9 @@ const EventPlanDetails = () => {
         setTimelineData(mockTimelineData);
         setProgressData(mockProgressData);
 
-        if (preferences) {
+        if (aiGeneratedPlan && mockTimelineData.length > 0) {
+          showInfo(`Event plan loaded with ${mockTimelineData.length} AI-generated timeline activities`);
+        } else if (preferences) {
           showInfo('Event plan loaded with preferences from dashboard');
         } else {
           showInfo('Event plan loaded successfully');

@@ -226,10 +226,14 @@ const EventPlanningDashboard = () => {
         duration: formData.duration
       });
 
+      const storedUser = sessionStorage.getItem('user') || localStorage.getItem('user');
+      const userId = storedUser ? JSON.parse(storedUser).id : null;
+
       const { data: aiContent, error: aiError } = await supabase
         .from('ai_generated_content')
         .insert({
           event_id: savedEvent.id,
+          user_id: userId,
           content_type: 'event_plan',
           prompt: formData.prompt || formData.description,
           generated_content: eventPlan,
