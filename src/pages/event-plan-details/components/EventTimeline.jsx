@@ -95,10 +95,17 @@ const EventTimeline = ({ timelineData, eventStartTime, onUpdateActivity, onAddAc
     <div className={`bg-card rounded-lg border border-border shadow-card ${className}`}>
       <div className="p-6 border-b border-border">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-foreground flex items-center space-x-2">
-            <Icon name="Clock" size={20} className="text-primary" />
-            <span>Event Timeline</span>
-          </h2>
+          <div>
+            <h2 className="text-lg font-semibold text-foreground flex items-center space-x-2">
+              <Icon name="Clock" size={20} className="text-primary" />
+              <span>Event Timeline</span>
+            </h2>
+            {timelineData && timelineData.length > 0 && (
+              <p className="text-xs text-muted-foreground mt-1">
+                {timelineData.length} activities scheduled
+              </p>
+            )}
+          </div>
           <Button
             variant="outline"
             size="sm"
